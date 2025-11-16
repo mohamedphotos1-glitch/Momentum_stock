@@ -19,7 +19,7 @@ def _extract_columns(data: pd.DataFrame, ticker: str) -> pd.DataFrame:
 
 
 def fetch_price_history(ticker: str, period: str = "1y", interval: str = "1d") -> Optional[pd.DataFrame]:
-    """Return a DataFrame with Close and Volume columns for *ticker*."""
+    """Return a DataFrame with OHLCV columns for *ticker*."""
 
     try:
         data = yf.download(
@@ -51,7 +51,12 @@ def fetch_price_history(ticker: str, period: str = "1y", interval: str = "1d") -
         LOGGER.warning("Missing Close/Volume for %s", ticker)
         return None
 
-    cleaned = data[[close_col, "Volume"]].rename(columns={close_col: "Close"}).copy()
+    selected_cols = [col for col in ("Open", "High", "Low", close_col, "Volume") if col in data.columns]
+    if {"Open", "High", "Low", "Volume"}.issubset(set(selected_cols)) is False:
+        LOGGER.warning("Missing OHLCV data for %s", ticker)
+        return None
+
+    cleaned = data[selected_cols].rename(columns={close_col: "Close"}).copy()
     cleaned.index = pd.to_datetime(cleaned.index)
     cleaned = cleaned.dropna()
 
@@ -59,8 +64,8 @@ def fetch_price_history(ticker: str, period: str = "1y", interval: str = "1d") -
         LOGGER.warning("Price data empty after cleaning for %s", ticker)
         return None
 
-    cleaned["Close"] = cleaned["Close"].astype(float)
-    cleaned["Volume"] = cleaned["Volume"].astype(float)
+    for column in cleaned.columns:
+        cleaned[column] = cleaned[column].astype(float)
     return cleaned
 
 
